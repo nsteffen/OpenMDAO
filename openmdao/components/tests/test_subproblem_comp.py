@@ -4,7 +4,6 @@ import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 import unittest
 
-# from openmdao.components.subproblem_comp import SubproblemComp
 
 class TestSubproblemComp(unittest.TestCase):
     def test_subproblem_comp(self):
@@ -80,3 +79,28 @@ class TestSubproblemComp(unittest.TestCase):
         assert(inputs['a']['val'] == 1)
         assert(inputs['b']['val'] == 2)
         assert(outputs['c']['val'] == 5)
+    
+    def test_wildcard(self):
+        p = om.Problem()
+        model = om.Group()
+
+        model.add_subsystem('subsys', om.ExecComp('z = x**2 + y**2'), promotes=['*'])
+        subprob = om.SubproblemComp(model=model, inputs=['*'], outputs=['*'])
+
+        p.model.add_subsystem('prob', subprob, promotes_inputs=['*'], promotes_outputs=['*'])
+        p.setup()
+
+        p.set_val('x', 1)
+        p.set_val('y', 2)
+
+        p.run_model()
+
+        inputs = p.model.prob.list_inputs()
+        outputs = p.model.prob.list_outputs()
+
+        inputs = {inputs[i][0]: inputs[i][1] for i in range(len(inputs))}
+        outputs = {outputs[i][0]: outputs[i][1] for i in range(len(outputs))}
+
+        assert(inputs['x']['val'] == 1)
+        assert(inputs['y']['val'] == 2)
+        assert(outputs['z']['val'] == 5)

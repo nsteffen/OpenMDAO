@@ -54,6 +54,13 @@ def _get_model_vars(varType, vars, model_vars):
         elif isinstance(var, str):
             # check if variable already exists in var_dict[varType]
             # i.e. no repeated variable names
+
+            if var == '*':
+                var_dict[varType].update({meta['prom_name']: meta for _,meta in model_vars})
+                return var_dict
+                # for name,meta in model_vars:
+                #     var_dict.update({name: meta})
+
             if var in var_dict[varType]:
                 raise Exception(f'Variable {var} already exists. Rename variable'
                                 ' or delete copy of variable.')
