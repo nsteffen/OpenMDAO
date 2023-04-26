@@ -239,18 +239,20 @@ class SubmodelComp(ExplicitComponent):
         if len(inputs) == 0 or len(outputs) == 0:
             return
 
-        for prom_name, _ in self.submodel_inputs:
+        for prom_name, iface_name in self.submodel_inputs:
             # changed this for consistency
             if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
                 continue
-            p.model.add_design_var(prom_name)
+            # p.model.add_design_var(prom_name)
+            self.add_design_var(iface_name)
 
-        for prom_name, _ in self.submodel_outputs:
+        for prom_name, iface_name in self.submodel_outputs:
             # got abs name back for self._cons key for some reason in `test_multiple_setups`
             # TODO look into this
             if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
                 continue
-            p.model.add_constraint(prom_name)
+            # p.model.add_constraint(prom_name)
+            self.add_constraint(iface_name)
 
         # setup again to compute coloring
         p.set_solver_print(-1)
