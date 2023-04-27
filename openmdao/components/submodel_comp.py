@@ -105,7 +105,8 @@ class SubmodelComp(ExplicitComponent):
             the last '.'.
         """
         if name is None:
-            name = path.split('.')[-1]
+            # name = path.split('.')[-1]
+            name = path.replace('.', ':')
 
         self.submodel_inputs.append((path, name))
 
@@ -133,7 +134,8 @@ class SubmodelComp(ExplicitComponent):
             the last '.'.
         """
         if name is None:
-            name = path.split('.')[-1]
+            name = path.replace('.', ':')
+            # name = path.split('.')[-1]
 
         self.submodel_outputs.append((path, name))
 
@@ -189,7 +191,7 @@ class SubmodelComp(ExplicitComponent):
             if len(matches) == 0:
                 raise Exception(f'Pattern {inp} not found in model')
             for match in matches:
-                self.submodel_inputs.append((match, match))
+                self.submodel_inputs.append((match, match.replace('.', ':')))
             self.submodel_inputs.remove(inp)
 
         for out in wildcard_outputs:
@@ -197,7 +199,7 @@ class SubmodelComp(ExplicitComponent):
             if len(matches) == 0:
                 raise Exception(f'Pattern {out} not found in model')
             for match in matches:
-                self.submodel_outputs.append((match, match))
+                self.submodel_outputs.append((match, match.replace('.', ':')))
             self.submodel_outputs.remove(out)
 
         # NOTE iface_name is what user refers to var as
@@ -215,6 +217,22 @@ class SubmodelComp(ExplicitComponent):
             super().add_input(iface_name, **meta)
             meta['prom_name'] = prom_name
 
+        input_prom_names = [prom_name for prom_name, _ in self.submodel_inputs]
+        # add design vars from subsystem
+        for abs_path, meta in p.driver._designvars.items():
+            prom_name = meta['name']
+            # if the input var is already there, don't add it again
+            if prom_name in input_prom_names:
+                continue
+            iface_name = meta['name'].replace('.', ':')
+
+            input_meta = next(inp_meta for name, inp_meta in self.boundary_inputs if name == abs_path)
+            self.submodel_inputs.append((prom_name, iface_name))
+
+            input_meta.pop('prom_name')
+            super().add_input(iface_name, **input_meta)
+            input_meta['prom_name'] = prom_name
+
         for var in self.submodel_outputs:
             iface_name = var[1]
             prom_name = var[0]
@@ -225,6 +243,24 @@ class SubmodelComp(ExplicitComponent):
             meta.pop('prom_name')
             super().add_output(iface_name, **meta)
             meta['prom_name'] = prom_name
+
+        output_prom_names = [prom_name for prom_name, _ in self.submodel_outputs]
+        # add responses from subsystem
+        for abs_path, meta in p.driver._responses.items():
+            prom_name = meta['name']
+            if prom_name in output_prom_names:
+                continue
+            iface_name = meta['name'].replace('.', ':')
+            
+            output_meta = next(out_meta for name, out_meta in self.all_outputs if name == abs_path)
+            self.submodel_outputs.append((prom_name, iface_name))
+            # try:
+            #     meta = next(data for _, data in self.all_outputs if data['prom_name'] == prom_name)
+            # except Exception:
+            #     raise Exception(f'Variable {prom_name} not found in model')
+            output_meta.pop('prom_name')
+            super().add_output(iface_name, **output_meta)
+            output_meta['prom_name'] = prom_name
 
         if not self.is_set_up:
             self.is_set_up = True
@@ -243,16 +279,16 @@ class SubmodelComp(ExplicitComponent):
             # changed this for consistency
             if prom_name in [meta['name'] for _, meta in p.driver._designvars.items()]:
                 continue
-            # p.model.add_design_var(prom_name)
-            self.add_design_var(iface_name)
+            p.model.add_design_var(prom_name)
+            # self.add_design_var(iface_name)
 
         for prom_name, iface_name in self.submodel_outputs:
             # got abs name back for self._cons key for some reason in `test_multiple_setups`
             # TODO look into this
             if prom_name in [meta['name'] for _, meta in p.driver._cons.items()]:
                 continue
-            # p.model.add_constraint(prom_name)
-            self.add_constraint(iface_name)
+            p.model.add_constraint(prom_name)
+            # self.add_constraint(iface_name)
 
         # setup again to compute coloring
         p.set_solver_print(-1)
